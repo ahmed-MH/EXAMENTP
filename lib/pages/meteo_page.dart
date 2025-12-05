@@ -3,45 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class MeteoPage extends StatefulWidget {
-  const MeteoPage({super.key, required this.ville});
-
-  final String ville;
+  const MeteoPage({super.key});
 
   @override
   State<MeteoPage> createState() => _MeteoPageState();
 }
 
 class _MeteoPageState extends State<MeteoPage> {
+  final TextEditingController _cityController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   Map<String, dynamic>? _meteoData;
+  bool _hasSearched = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _chargerMeteo();
-  }
-
-  Future<void> _chargerMeteo() async {
+  Future<void> _chargerMeteo(String ville) async {
     try {
       final String response = await rootBundle.loadString('assets/data.json');
-      // Decode as a Map (single object)
       final Map<String, dynamic> data = json.decode(response);
 
-      // Check if the city name matches the search query (case insensitive)
       final String cityName = data['name'].toString();
-      final cityData = cityName.toLowerCase() == widget.ville.toLowerCase() ? data : null;
+      final cityData = cityName.toLowerCase() == ville.toLowerCase()
+          ? data
+          : null;
 
       if (mounted) {
         setState(() {
           _meteoData = cityData;
+          _hasSearched = true;
         });
 
         if (cityData == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                "Ville '${widget.ville}' non trouvée. Seule la ville '$cityName' est disponible.",
-              ),
-            ),
+            SnackBar(content: Text("Ville '$ville' non trouvée.")),
           );
         }
       }
@@ -54,80 +46,136 @@ class _MeteoPageState extends State<MeteoPage> {
     }
   }
 
+  void _onSearch() {
+    if (_formKey.currentState!.validate()) {
+      _chargerMeteo(_cityController.text);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cityController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Météo: ${widget.ville}')),
-      body: _meteoData == null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      appBar: AppBar(title: const Text('Recherche Meteo')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Form(
+              key: _formKey,
+              child: Row(
                 children: [
-                  const Text(
-                    "Météo introuvable pour cette ville.",
-                    style: TextStyle(fontSize: 18),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ville',
+                        hintText: 'Entrez une ville',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Requis';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(width: 10),
                   ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Retour'),
-                  ),
-                ],
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            _meteoData!['name'],
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blueAccent,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            "${_meteoData!['main']['temp']} °C",
-                            style: const TextStyle(
-                              fontSize: 48, 
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                    onPressed: _onSearch,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 20,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildInfoCard(
-                        icon: Icons.water_drop,
-                        label: "Temperature Minimale",
-                        value: "${_meteoData!['main']['temp_min']} °C",
-                      ),
-                      _buildInfoCard(
-                        icon: Icons.air,
-                        label: "Temperature Maximale",
-                        value: "${_meteoData!['main']['temp_max']} °C",
-                      ),
-                    ],
+                    child: const Icon(Icons.search),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+            Expanded(child: _buildContent()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (!_hasSearched) {
+      return const Center(
+        child: Text(
+          "Entrez un nom de ville pour voir la météo.",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
+    if (_meteoData == null) {
+      return const Center(
+        child: Text("Aucune donnée trouvée.", style: TextStyle(fontSize: 18)),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Text(
+                    _meteoData!['name'],
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    "${_meteoData!['main']['temp']} °C",
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildInfoCard(
+                icon: Icons.water_drop,
+                label: "Min",
+                value: "${_meteoData!['main']['temp_min']} °C",
+              ),
+              _buildInfoCard(
+                icon: Icons.air,
+                label: "Max",
+                value: "${_meteoData!['main']['temp_max']} °C",
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
