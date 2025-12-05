@@ -10,52 +10,37 @@ class MeteoPage extends StatefulWidget {
 }
 
 class _MeteoPageState extends State<MeteoPage> {
-  final TextEditingController _cityController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  String ville = "";
   Map<String, dynamic>? _meteoData;
   bool _hasSearched = false;
 
-  Future<void> _chargerMeteo(String ville) async {
+  Future<void> _chargerMeteo() async {
+    if (ville.isEmpty) return;
+
     try {
       final String response = await rootBundle.loadString('assets/data.json');
       final Map<String, dynamic> data = json.decode(response);
 
       final String cityName = data['name'].toString();
-      final cityData = cityName.toLowerCase() == ville.toLowerCase()
-          ? data
-          : null;
 
-      if (mounted) {
-        setState(() {
-          _meteoData = cityData;
-          _hasSearched = true;
-        });
-
-        if (cityData == null) {
+      setState(() {
+        _hasSearched = true;
+        if (cityName.toLowerCase() == ville.toLowerCase()) {
+          _meteoData = data;
+        } else {
+          _meteoData = null;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Ville '$ville' non trouvée.")),
           );
         }
-      }
+      });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur lors du chargement de la météo: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Erreur: $e")));
       }
     }
-  }
-
-  void _onSearch() {
-    if (_formKey.currentState!.validate()) {
-      _chargerMeteo(_cityController.text);
-    }
-  }
-
-  @override
-  void dispose() {
-    _cityController.dispose();
-    super.dispose();
   }
 
   @override
@@ -66,40 +51,28 @@ class _MeteoPageState extends State<MeteoPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Form(
-              key: _formKey,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _cityController,
-                      decoration: const InputDecoration(
-                        labelText: 'Ville',
-                        hintText: 'Entrez une ville',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Requis';
-                        }
-                        return null;
-                      },
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Ville',
+                      hintText: 'Entrez Ville',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
                     ),
+                    onChanged: (text) => ville = text,
                   ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: _onSearch,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 20,
-                        horizontal: 20,
-                      ),
-                    ),
-                    child: const Icon(Icons.search),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _chargerMeteo,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(20),
                   ),
-                ],
-              ),
+                  child: const Icon(Icons.search),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             Expanded(child: _buildContent()),
@@ -111,18 +84,11 @@ class _MeteoPageState extends State<MeteoPage> {
 
   Widget _buildContent() {
     if (!_hasSearched) {
-      return const Center(
-        child: Text(
-          "Entrez un nom de ville pour voir la météo.",
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      );
+      return const Center(child: Text("Entrez un nom de ville (ex: Paris)"));
     }
 
     if (_meteoData == null) {
-      return const Center(
-        child: Text("Aucune donnée trouvée.", style: TextStyle(fontSize: 18)),
-      );
+      return const Center(child: Text("Aucune donnée trouvée."));
     }
 
     return SingleChildScrollView(
@@ -131,9 +97,6 @@ class _MeteoPageState extends State<MeteoPage> {
         children: [
           Card(
             elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -162,16 +125,8 @@ class _MeteoPageState extends State<MeteoPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildInfoCard(
-                icon: Icons.water_drop,
-                label: "Min",
-                value: "${_meteoData!['main']['temp_min']} °C",
-              ),
-              _buildInfoCard(
-                icon: Icons.air,
-                label: "Max",
-                value: "${_meteoData!['main']['temp_max']} °C",
-              ),
+              _infoCard("Min", "${_meteoData!['main']['temp_min']} °C"),
+              _infoCard("Max", "${_meteoData!['main']['temp_max']} °C"),
             ],
           ),
         ],
@@ -179,19 +134,13 @@ class _MeteoPageState extends State<MeteoPage> {
     );
   }
 
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget _infoCard(String label, String value) {
     return Card(
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(icon, size: 30, color: Colors.blueGrey),
-            const SizedBox(height: 8),
             Text(label, style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 4),
             Text(
