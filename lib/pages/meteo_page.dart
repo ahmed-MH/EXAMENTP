@@ -11,11 +11,20 @@ class MeteoPage extends StatefulWidget {
 
 class _MeteoPageState extends State<MeteoPage> {
   String ville = "";
+  String? errorText;
   Map<String, dynamic>? _meteoData;
   bool _hasSearched = false;
 
   Future<void> _chargerMeteo() async {
-    if (ville.isEmpty) return;
+    if (ville.isEmpty) {
+      setState(() {
+        errorText = "Veuillez saisir une ville";
+      });
+      return;
+    }
+    setState(() {
+      errorText = null;
+    });
 
     try {
       final String response = await rootBundle.loadString('assets/data.json');
@@ -55,11 +64,12 @@ class _MeteoPageState extends State<MeteoPage> {
               children: [
                 Expanded(
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Ville',
                       hintText: 'Entrez Ville',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.search),
+                      border: const OutlineInputBorder(),
+                      errorText: errorText,
                     ),
                     onChanged: (text) => ville = text,
                   ),
@@ -84,7 +94,7 @@ class _MeteoPageState extends State<MeteoPage> {
 
   Widget _buildContent() {
     if (!_hasSearched) {
-      return const Center(child: Text("Entrez un nom de ville (ex: Paris)"));
+      return const Center(child: Text("Entrez un nom de ville"));
     }
 
     if (_meteoData == null) {
@@ -143,10 +153,7 @@ class _MeteoPageState extends State<MeteoPage> {
           children: [
             Text(label, style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
